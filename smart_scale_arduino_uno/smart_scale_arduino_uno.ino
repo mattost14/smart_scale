@@ -1,14 +1,9 @@
 /*
- * circuits4you.com
+ 
  * 2016 November 25
  * Load Cell HX711 Module Interface with Arduino to measure weight in Kgs
  Arduino 
  pin 
- 2 -> HX711 CLK
- 3 -> DOUT
- 5V -> VCC
- GND -> GND
- 
  Most any pin on the Arduino Uno will be compatible with DOUT/CLK.
  The HX711 board can be powered from 2.7V to 5V so the Arduino 5V power should be fine.
 */
@@ -168,7 +163,9 @@ String uploadWebServer(float value){
     wait_time=0;
     while(!newData && wait_time < 10000){
       recvWithStartEndMarkers(); //check for wifi module answer
+      Serial.print(".");
     }
+    Serial.println();
     if(newData)
        return String(receivedChars);
     else

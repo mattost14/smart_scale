@@ -18,14 +18,15 @@
 
 #include <ESP8266WiFi.h>
 #include <ESP8266HTTPClient.h>
+#include <ArduinoJson.h>
 
 const char* ssid = "MATTOS220";
 const char* password = "mattost14";
 
-//const char* host = "http://192.168.0.102";
-IPAddress host(192,168,0,102);
-const int httpsPort = 5000;
-const String url="http://192.168.0.2:5000/uploadmyweight/";
+//const char* host = "http://mattost14.pythonanywhere.com/uploadmyweight/";
+//PAddress host(192,168,0,102);
+//const int httpsPort = 5000;
+const String url="http://mattost14.pythonanywhere.com/uploadmyweight";
 String peso;
 char data[100];
 
@@ -48,10 +49,19 @@ void loop() {
   /*if (Serial.available()) {
     Serial.write(Serial.read());
   }*/
+//  StaticJsonBuffer<300> JSONbuffer;
+//  JsonObject& JSONencoder = JSONbuffer.createObject();
+//
+//  JSONencoder["source_public_id"] = 1234;
+//  JSONencoder["measure"] = 40;
+//
+//   char JSONmessageBuffer[300];
+//   JSONencoder.prettyPrintTo(JSONmessageBuffer, sizeof(JSONmessageBuffer));
+  
   recvWithStartEndMarkers();
   if(newData && WiFi.status() == WL_CONNECTED){
     showNewData();
-    httpsPost(url, String(receivedChars));
+    httpsPost(url, receivedChars);
   }
   
   
@@ -130,20 +140,24 @@ boolean wifiConnection() {
   return false;
 }
 
-void httpsPost(String url, String data) {
-  char msg[30];
+void httpsPost(String url, char* data) {
+  char msg[50];
   http.begin(url);
-  http.addHeader("Content-type","application/json");
+  Serial.print("Posting DATA: ");
+  Serial.print(String(data));
+  Serial.print(" to URL: ");
+  Serial.println(url);
+  http.addHeader("Content-Type","application/json");
   int httpCode = http.POST(data);
   String payload = http.getString();
-  if(httpCode<0)//got an error
+  if(httpCode!=200){//got an error
     //Serial.println(http.errorToString(httpCode).c_str());
     Serial.println(httpCode);
     sprintf(msg, "<Error:%d>", httpCode);
     if(Serial.available())
-        Serial.write(msg); //Send msg to arduino   
+        Serial.write(msg); //Send msg to arduino
+  }   
   else{
-    Serial.println(httpCode);
     Serial.println(payload);
     if(Serial.available())
         Serial.write("<Uploaded>"); //Send msg to arduino
