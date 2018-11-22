@@ -35,22 +35,28 @@ elapsedMillis timeElapsed, wait_time;
 //=============================================================================================
 void setup() {
   Serial.begin(115200);
-  
-  Serial.println("Press t for tare");
+
+
   scale.set_scale(18600);
-  lcd.setCursor(2,0);
-  lcd.print("Calibrando...");
-  delay(2000);
-  scale.tare(); //Reset the scale to 0
+
 
   lcd.begin(20,4);
   lcd.setCursor(2,0);
-  lcd.print("Suba na Balanca");
+  lcd.print("__SMART SCALE__");
+  lcd.setCursor(2,2);
+  lcd.print("Inicializando...");
+  Serial.println("Press t for tare");
+  delay(1500);
+  scale.tare(); //Reset the scale to 0
+
+  //lcd.backlight();
+  //lcd.begin(20,4);
+  //lcd.setCursor(2,2);
+  //lcd.print("Suba na Balanca");
 
 
   count=0;
   timeElapsed = 0;
- 
 }
  
 //=============================================================================================
@@ -63,39 +69,54 @@ void loop() {
 //  else
 //    Serial.println("Wifi module: failed!");
 
+  //Check weight measurement and stability after 100 cycles or during the interval time (3 sec) 
   if(count==100 || timeElapsed>interval){   
     int size_array = sizeof(weight) / sizeof(weight[0]);
-    if(checkStability(weight,count)){
+
+    //Get in if the weight is stable on the balance
+    int checkWeight = checkStability(weight,count);
+    if(checkWeight==1){
       //Serial.println("Peso Estabelecido!");
       lcd.clear();
       lcd.setCursor(0,0);
       lcd.print("Peso Fixado:");
-      lcd.setCursor(12,0);
+      lcd.setCursor(13,0);
       lcd.print(weight[1], 2);
       lcd.setCursor(17,0);
       lcd.print("kg");
       cancel=false;
+      lcd.setCursor(3,2);
+      lcd.print("Enviando em:");
       for (int i=3; i>=0; i--){
-        lcd.setCursor(10,2);
+        lcd.setCursor(16,2);
         lcd.print(i);
         delay(1500);
         if(scale.get_units()<.5){
-          cancel = true;
+          cancel = true; 
           break;
         }
       }
+      //Cancel is true if the weight is withdrawn during the count down  
       if(cancel){
           lcd.clear();
-          lcd.setCursor(5,2);
-          lcd.print("Cancelado!");
-          delay(2000);
+          lcd.setCursor(0,0);
+          lcd.print("Vc saiu da balanca!");
+          lcd.setCursor(2,2);
+          lcd.print("Envio Cancelado!");
+          delay(1500);
+          lcd.clear();
+          lcd.setCursor(2,2);
+          lcd.print("Recalibrando...");
+          delay(1500);
+          scale.tare();
       }
-      else{
+      //If weight is on during the count down, then send it to web server
+      else{ 
           String msg;
           int timeout = 5000;
           wait_time=0;
           lcd.setCursor(5,2);
-          lcd.print("Enviando..");
+          lcd.print("Enviando...");
           msg = uploadWebServer(weight[1]);
           Serial.println();
           Serial.println(msg);    
@@ -107,28 +128,43 @@ void loop() {
           }
           else{
             lcd.clear();
+            lcd.setCursor(8,0);
+            lcd.print("Ops!");
             lcd.setCursor(2,2);
             lcd.print("Erro no Envio!"); 
             delay(3000); 
           }
       }
     }
-    lcd.clear();
-    lcd.setCursor(2,0);
-    lcd.print("Suba na Balanca");
+    //If the weight is bellow the minimun threshold (0.5kg)
+    if(checkWeight==0){
+      lcd.clear();
+      lcd.setCursor(2,2);
+      lcd.print("Suba na Balanca");
+      delay(2000);
+      lcd.noBacklight(); //Turn the LCD off
+    }
+    if(checkWeight==2){ //Weight not stable enough
+      lcd.clear();
+      lcd.setCursor(2,2);
+      lcd.print("Estabilize");    
+    }
     count=0;
     timeElapsed = 0;    
   }
+  //If the timelapsed is less than 3sec or the cycle number is less than 100
   else{
     weight[count] = scale.get_units();
+    //If it detects some relevant weight on
     if(weight[count]>0.1){
+      lcd.backlight(); //Turn the LCD lights
       lcd.clear();
       lcd.setCursor(2,0);
       lcd.print("Pesando...");
       lcd.setCursor(6,2);
       lcd.print(weight[count]);
       lcd.print(" kg");
-      delay(400);
+      delay(300);
     }
     count++;
   }
@@ -208,7 +244,7 @@ void recvWithStartEndMarkers() {
     }
 }
 
-bool checkStability(float value[], int count){
+int checkStability(float value[], int count){
   //find minimum value
     int index=1;
     float max_weight, min_weight;
@@ -233,14 +269,14 @@ bool checkStability(float value[], int count){
       }
       max_weight = value[index];
     }
-    else{
-      return false;
+    else{ 
+      return 0; //Not enough weight
     }
     if((max_weight-min_weight)< 0.2){
-      return true;
+      return 1; //Enough weight and stability
     }
     else{
-      return false;
+      return 2; //Not stable enough
     }  
 }
 //=============================================================================================
